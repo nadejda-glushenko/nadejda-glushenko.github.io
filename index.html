@@ -717,8 +717,16 @@ section[data-section-role="additional-service"] .subtle-box.is-featured,
   position:fixed;inset:0;width:100%;height:100dvh;max-width:none;max-height:none;
   margin:0;padding:0;overflow:hidden;background:#000;color:#fff;
 }
-#intro-video-dialog[open] {display:grid;place-items:center;animation:none;}
-#intro-video-dialog video {width:100%;height:100%;object-fit:contain;cursor:pointer;}
+#intro-video-dialog[open] {
+  display:grid;grid-template-rows:minmax(0,1fr) auto;place-items:center;animation:none;
+}
+#intro-video-dialog video {width:100%;height:100%;min-height:0;object-fit:contain;cursor:pointer;}
+#intro-video-dialog .video-seek {
+  box-sizing:border-box;
+  width:calc(100% - max(16px,env(safe-area-inset-left)) - max(16px,env(safe-area-inset-right)));
+  height:40px;margin:0 0 env(safe-area-inset-bottom,0px);
+  accent-color:var(--button);color-scheme:light;cursor:pointer;
+}
 #intro-video-dialog .video-close {
   position:absolute;z-index:1;top:max(12px,env(safe-area-inset-top));
   right:max(12px,env(safe-area-inset-right));background:#13131bbd;color:#fff;
@@ -984,6 +992,8 @@ section[data-section-role="additional-service"] .subtle-box.is-featured,
   <button aria-label="Закрыть видео" class="round video-close" data-close type="button" autofocus><svg aria-hidden="true"><use href="#i-close"></use></svg></button>
   <p class="video-error" role="status" hidden>Видео пока недоступно.</p>
   <video playsinline preload="none" tabindex="0" role="button" aria-label="Поставить видео на паузу"></video>
+  <input class="video-seek" type="range" min="0" max="100" value="0" step="any"
+         aria-label="Перемотка видео" disabled>
 </dialog>
 
 <dialog aria-label="Навигация" class="full-dialog" id="menu"><div class="dialog-head"><span>Надежда Глущенко</span><button aria-label="Закрыть меню" class="round" data-close=""><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div><div class="dialog-scroll"><nav aria-label="Разделы сайта" class="menu-nav"><button data-jump="about">Обо мне</button><button data-jump="services">Услуги</button><button data-jump="courses">Другие программы</button><button data-jump="free">САМОСТОЯТЕЛЬНАЯ РАБОТА</button><button data-jump="reviews">Отзывы</button><button data-jump="socials">Контакты</button></nav></div></dialog>
@@ -1613,13 +1623,34 @@ document.querySelectorAll('.reviews').forEach(section => {
   const dialog = document.querySelector('#intro-video-dialog');
   const video = dialog.querySelector('video');
   const message = dialog.querySelector('.video-error');
+  const seek = dialog.querySelector('.video-seek');
+
+  function syncSeek() {
+    const duration = video.duration;
+    const canSeek = Number.isFinite(duration) && duration > 0;
+    seek.disabled = !canSeek;
+    seek.value = canSeek ? (video.currentTime / duration) * 100 : 0;
+  }
+
+  for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'emptied']) {
+    video.addEventListener(event, syncSeek);
+  }
+  seek.addEventListener('input', () => {
+    if (!seek.disabled) video.currentTime = (seek.valueAsNumber / 100) * video.duration;
+  });
 
   function reportPlaybackError(error) {
-    if (dialog.open && error?.name !== 'AbortError') message.hidden = false;
+    if (dialog.open && error?.name !== 'AbortError') {
+      message.hidden = false;
+      seek.hidden = true;
+    }
   }
 
   preview.addEventListener('click', () => {
     message.hidden = true;
+    seek.hidden = false;
+    seek.disabled = true;
+    seek.value = 0;
     video.src = './VIDEO1.mp4';
     video.muted = false;
     openDialog(dialog);
